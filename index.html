@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Added and Removed Prefabs</title>
+    <style>
+        body {
+            font-family: "Fira Code", monospace;
+            font-optical-sizing: 1em;
+            font-weight: 700;
+            font-style: normal;
+            margin: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        ul {
+            list-style-type: none;
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        li {
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            float: left;
+            clear: left;
+        }
+
+        li:hover {
+            background-color: #e0e0e0;
+        }
+
+        .file {
+            justify-content: space-between;
+            align-items: center;
+            cursor: default;
+        }
+
+        .path {
+            font-size: 0.9em;
+            color: #666;
+            display: none;
+        }
+
+        .copy-btn {
+            background-color: #007bff;
+            border: none;
+            color: white;
+            padding: 2px 5px;
+            font-size: 0.8em;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .copy-btn:hover {
+            background-color: #0056b3;
+        }
+
+        .id {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8em;
+            color: #333;
+            border: 1px solid #ccc;
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+
+        .directory-toggle {
+            display: inline-block;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+
+        .directory-collapsed::before {
+            display: inline-block;
+            width: 1.2em;
+            height: 1.2em;
+            width: 1.2em;
+            content: '▶';
+        }
+
+        .directory-expanded::before {
+            display: inline-block;
+            width: 1.2em;
+            height: 1.2em;
+            width: 1.2em;
+            content: '▼';
+        }
+
+        .directory-collapsed>ul {
+            display: none;
+        }
+
+        .directory-expanded>ul {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <label for="old">Old:</label>
+        <select id="old">
+        </select>
+
+        <label for="new">New:</label>
+        <select id="new">
+        </select>
+
+        <button id="go">Go</button>
+    </div>
+    <div>
+        <h3>Added</h3>
+        <ul id="Added" class="listroot">
+        </ul>
+    </div>
+    <br clear="all" />
+    <div>
+        <h3>Removed</h3>
+        <ul id="Removed" class="listroot">
+        </ul>
+    </div>
+
+    <script>
+        // Function to build a nested directory structure from file list
+        function buildDirectoryTree(files) {
+            const root = {};
+
+            files.forEach(file => {
+                // Pop to remove filename
+                const parts = file.path.split('/');
+                parts.pop();
+
+                let currentLevel = root;
+
+                parts.forEach((part, index) => {
+                    if (!currentLevel[part]) {
+                        currentLevel[part] = {};
+                    }
+                    currentLevel = currentLevel[part];
+                });
+
+                if (!Array.isArray(currentLevel['__file']))
+                    currentLevel['__file'] = Array();
+                // Attach file information
+
+                currentLevel['__file'].push({
+                    path: file.path,
+                    id: file.id
+                });
+            });
+
+            return root;
+        }
+
+        // Recursive function to create a list from the directory tree
+        function createFileListFromTree(tree, parentElement) {
+            // clean object
+            while (parentElement.firstChild) {
+                parentElement.removeChild(parentElement.lastChild);
+            }
+
+            Object.keys(tree).forEach(key => {
+                if (key === '__file') {
+                    // Handle files
+                    tree[key].forEach(file => {
+                        const fileElement = document.createElement('li');
+                        fileElement.className = 'file';
+                        fileElement.innerHTML = `
+                            <span title="${file.path}">${file.path.split('/').pop()}</span>
+                            <button class="copy-btn" title="Copy path and filename" onclick="copyToClipboard('${file.path}'); event.stopPropagation();">📋</button>
+                            <span class="id">${file.id}</span>
+                            <button class="copy-btn" title="Copy id" onclick="copyToClipboard('${file.id}'); event.stopPropagation();">📋</button>
+                        `;
+                        parentElement.appendChild(fileElement);
+                    });
+                } else {
+                    // Handle directories
+                    const dirElement = document.createElement('li');
+                    dirElement.textContent = key;
+                    dirElement.classList.add('directory-toggle', 'directory-expanded');
+                    const subList = document.createElement('ul');
+                    subList.classList.add('directory-content');
+                    dirElement.appendChild(subList);
+                    parentElement.appendChild(dirElement);
+
+                    // Recursively create subdirectory content
+                    createFileListFromTree(tree[key], subList);
+                }
+            });
+        }
+
+        async function fetchData(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok ' + response.statusText);
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Fetch error:', error);
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+        }
+
+        function toggleDirectory(event) {
+            const target = event.target;
+            if (target.classList.contains('directory-collapsed')) {
+                target.classList.remove('directory-collapsed');
+                target.classList.add('directory-expanded');
+            } else {
+                target.classList.remove('directory-expanded');
+                target.classList.add('directory-collapsed');
+            }
+        }
+
+
+
+
+        window.onload = function () {
+            const builds = ["main", "staging", "aux01", "aux02", "public", "release"];
+
+            function populateDropdown(id) {
+                const selectElement = document.getElementById(id);
+                builds.forEach(build => {
+                    const option = document.createElement('option');
+                    option.value = build;
+                    option.textContent = build;
+                    selectElement.appendChild(option);
+                });
+            }
+            // Populate both dropdowns
+            populateDropdown('old');
+            populateDropdown('new');
+
+            document.querySelectorAll('.listroot').forEach(obj => {
+                obj.addEventListener('click', function (event) {
+                    if (event.target.classList.contains('directory-toggle'))
+                        toggleDirectory(event);
+                });
+            });
+
+            document.getElementById('go').addEventListener('click', function (event) {
+                const oldbuild = document.getElementById('old').value;
+                const newbuild = document.getElementById('new').value;
+
+                const proxyUrl = 'https://cors-proxy.fringe.zone/';
+                const targetUrl = `https://builds.rustmaps.com/builds/compare?base=${oldbuild}&compare=${newbuild}`;
+                fetchData(proxyUrl + targetUrl).then(data => {
+                    if (data && data.data && data.data.prefabs && data.data.prefabs.added) {
+                        var fileList = data.data.prefabs.added;
+                        var tree = buildDirectoryTree(fileList);
+                        createFileListFromTree(tree, document.getElementById('Added'));
+                        fileList = data.data.prefabs.removed;
+                        tree = buildDirectoryTree(fileList);
+                        createFileListFromTree(tree, document.getElementById('Removed'));
+                    } else {
+                        console.error('Invalid data format');
+                    }
+                });
+
+
+            });
+        }
+    </script>
+</body>
+
+</html>
