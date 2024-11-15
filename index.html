@@ -255,8 +255,8 @@
                 const oldbuild = document.getElementById('old').value;
                 const newbuild = document.getElementById('new').value;
 
-                const proxyUrl = 'https://cors-proxy.fringe.zone/';
-                const targetUrl = `https://builds.rustmaps.com/builds/compare?base=${oldbuild}&compare=${newbuild}`;
+                const proxyUrl = 'https://corsproxy.io/?';
+                const targetUrl = encodeURIComponent(`https://builds.rustmaps.com/builds/compare?base=${oldbuild}&compare=${newbuild}`);
                 fetchData(proxyUrl + targetUrl).then(data => {
                     if (data && data.data && data.data.prefabs && data.data.prefabs.added) {
                         var fileList = data.data.prefabs.added;
